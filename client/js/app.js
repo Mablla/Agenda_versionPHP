@@ -1,10 +1,31 @@
 
-
-
 class EventsManager {
     constructor() {
         this.obtenerDataInicial()
     }
+
+    fechaActual(){
+      let f = new Date()
+      return  f.getFullYear() + "/" + (f.getMonth() +1) + "/" + f.getDate()
+    }
+
+    entreComilla(dato){
+      return "'"+dato+"'"
+    }
+
+    verificaDatos(titulo, dia_ini,hora_ini,dia_fin,hora_fin,diaCompleto){
+      let ms, fecha_ini, fecha_fin
+      if (titulo=="") {return "Verifique título"}
+      if (dia_ini=="") {return "Verifique fecha inicio"}
+      if (dia_fin=="") {if (diaCompleto == 0){return "Verifique fecha fin o ponga día Completo"} else {return "OK"}}
+      ms = Date.parse(dia_ini+" "+hora_ini)
+      fecha_ini = new Date(ms)
+      ms = Date.parse(dia_fin+" "+hora_fin)
+      fecha_fin = new Date(ms)
+      if (fecha_ini <= fecha_fin) {return "OK"} else {return "Fechas imposibles. Verirfique."}
+    }
+
+
 
 
     obtenerDataInicial() {
@@ -24,21 +45,22 @@ class EventsManager {
               window.location.href = 'index.html';
             }
           },
-          error: function(){
-            alert("error en la comunicación con el servidor");
+          error: function(e){
+            alert("error en la comunicación con el servidor:obtenerDataInicial"+JSON.stringify(e));
           }
         })
 
     }
 
     poblarCalendario(eventos) {
+
         $('.calendario').fullCalendar({
             header: {
         		left: 'prev,next today',
         		center: 'title',
         		right: 'month,agendaWeek,basicDay'
         	},
-        	defaultDate: '2016-11-01',
+        	defaultDate: this.fechaActual(),
         	navLinks: true,
         	editable: true,
         	eventLimit: true,
@@ -71,56 +93,64 @@ class EventsManager {
     }
 
     anadirEvento(){
-      var form_data = new FormData();
-      form_data.append('titulo', $('#titulo').val())
-      form_data.append('start_date', $('#start_date').val())
-      form_data.append('allDay', document.getElementById('allDay').checked)
-      if (!document.getElementById('allDay').checked) {
-        form_data.append('end_date', $('#end_date').val())
-        form_data.append('end_hour', $('#end_hour').val())
-        form_data.append('start_hour', $('#start_hour').val())
-      }else {
-        form_data.append('end_date', "")
-        form_data.append('end_hour', "")
-        form_data.append('start_hour', "")
-      }
-      $.ajax({
-        url: '../server/new_event.php',
-        dataType: "json",
-        cache: false,
-        processData: false,
-        contentType: false,
-        data: form_data,
-        type: 'POST',
-        success: (data) =>{
-          if (data.msg=="OK") {
-            alert('Se ha añadido el evento exitosamente')
-            if (document.getElementById('allDay').checked) {
-              $('.calendario').fullCalendar('renderEvent', {
-                title: $('#titulo').val(),
-                start: $('#start_date').val(),
-                allDay: true
-              })
-            }else {
-              $('.calendario').fullCalendar('renderEvent', {
-                title: $('#titulo').val(),
-                start: $('#start_date').val()+" "+$('#start_hour').val(),
-                allDay: false,
-                end: $('#end_date').val()+" "+$('#end_hour').val()
-              })
-            }
 
-
-
-
-          }else {
-            alert(data.msg)
-          }
-        },
-        error: function(){
-          alert("error en la comunicación con el servidor");
+      let msj = this.verificaDatos ($('#titulo').val(), $('#start_date').val(), $('#start_hour').val(), $('#end_date').val(), $('#end_hour').val(),document.getElementById('allDay').checked );
+      if (msj =="OK" )  {
+        var form_data = new FormData();
+        form_data.append('titulo', this.entreComilla($('#titulo').val()))
+        form_data.append('fecha_inicio', this.entreComilla($('#start_date').val()))
+        form_data.append('dia_completo', document.getElementById('allDay').checked)
+        if (!document.getElementById('allDay').checked) {
+          alert("! null")
+          form_data.append('fecha_fin', this.entreComilla($('#end_date').val()))
+          form_data.append('hora_fin', this.entreComilla($('#end_hour').val()))
+          form_data.append('hora_inicio', this.entreComilla($('#start_hour').val()))
+        }else {
+          alert("null")
+          form_data.append('fecha_fin', null)
+          form_data.append('hora_fin', null)
+          form_data.append('hora_inicio', null)
         }
-      })
+        alert(JSON.stringify(form_data))
+        $.ajax({
+          url: '../server/new_event.php',
+          dataType: "json",
+          cache: false,
+          processData: false,
+          contentType: false,
+          data: form_data,
+          type: 'POST',
+          success: (data) =>{
+            if (data.msg=="OK") {
+              alert('Se ha añadido el evento exitosamente')
+              if (document.getElementById('allDay').checked) {
+                $('.calendario').fullCalendar('renderEvent', {
+                  id: data.id,
+                  title: $('#titulo').val(),
+                  start: $('#start_date').val(),
+                  allDay: true
+                })
+              }else {
+                alert($('#start_date').val()+" "+$('#start_hour').val())
+                alert($('#end_date').val()+" "+$('#end_hour').val())
+                $('.calendario').fullCalendar('renderEvent', {
+                  id: data.id,
+                  title: $('#titulo').val(),
+                  start: $('#start_date').val()+"T"+$('#start_hour').val(),
+                  allDay: false,
+                  end: $('#end_date').val()+"T"+$('#end_hour').val()
+                })
+              }
+            }else {
+              alert(data.msg)
+            }
+          },
+          error: function(e){
+            alert("error en la comunicación con el servidor:Añadir evento");
+            alert(JSON.stringify(e));
+          }
+        })
+      } else {alert (msj)}
 
     }
 
@@ -143,8 +173,9 @@ class EventsManager {
             alert(data.msg)
           }
         },
-        error: function(){
-          alert("error en la comunicación con el servidor");
+        error: function(e){
+          alert("error en la comunicación con el servidor:Eliminar Evento");
+          alert(JSON.stringify(e));
         }
       })
       $('.delete-btn').find('img').attr('src', "img/trash.png");
@@ -161,17 +192,46 @@ class EventsManager {
             start_hour,
             end_hour
 
-        start_date = start.substr(0,10)
-        end_date = end.substr(0,10)
-        start_hour = start.substr(11,8)
-        end_hour = end.substr(11,8)
 
+        alert(evento.allDay)
+        alert(start)
+        if (!evento.allDay){
+            alert('ingresa por detalle del día')
+          if (start != "Invalid date") {
+            start_date = "'"+start.substr(0,10)+"'"
+            start_hour = "'"+start.substr(11,8)+"'"
+          } else {
+            start_date = null
+            start_hour = null
+          }
+          alert(end)
+          if (end != "Invalid date"){
+            end_date = "'"+end.substr(0,10)+"'"
+            end_hour = "'"+end.substr(11,8)+"'"
+          } else{
+            end_date = null
+            end_hour = null
+          }
+
+        } else {
+          alert('ingresa por todo el día')
+          if (start != "Invalid date") {
+            start_date = "'"+start.substr(0,10)+"'"
+          } else {
+            start_date = null
+          }
+          start_hour = null
+          end_date = null
+          end_hour = null
+        }
 
         form_data.append('id', id)
-        form_data.append('start_date', start_date)
-        form_data.append('end_date', end_date)
-        form_data.append('start_hour', start_hour)
-        form_data.append('end_hour', end_hour)
+        form_data.append('fecha_inicio', start_date)
+        form_data.append('fecha_fin', end_date)
+        form_data.append('hora_inicio', start_hour)
+        form_data.append('hora_fin', end_hour)
+
+
 
         $.ajax({
           url: '../server/update_event.php',
@@ -188,14 +248,15 @@ class EventsManager {
               alert(data.msg)
             }
           },
-          error: function(){
-            alert("error en la comunicación con el servidor");
+          error: function(e){
+            alert("error en la comunicación con el servidor:Actualizar evento");
+            alert(JSON.stringify(e));
           }
         })
     }
 
 }
-
+// fin class EventsManager
 
 $(function(){
   initForm();
@@ -209,6 +270,7 @@ $(function(){
 
 
 function initForm(){
+  $('#allDay').prop('checked', false);
   $('#start_date, #titulo, #end_date').val('');
   $('#start_date, #end_date').datepicker({
     dateFormat: "yy-mm-dd"
@@ -226,9 +288,11 @@ function initForm(){
   });
   $('#allDay').on('change', function(){
     if (this.checked) {
+      $('#start_hour, #end_hour, #end_date').val('')
       $('.timepicker, #end_date').attr("disabled", "disabled")
     }else {
       $('.timepicker, #end_date').removeAttr("disabled")
+        $('#start_hour, #end_hour').val('7:00')
     }
   })
 
